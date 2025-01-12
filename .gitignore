@@ -2,3 +2,4 @@
 /config/user.json
 /venv
 __pycache__
+/log

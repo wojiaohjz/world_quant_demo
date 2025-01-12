@@ -2,41 +2,45 @@ from api.auth_login import AuthLogin
 import time
 import pandas as pd
 
+from common.log import logger
+
 
 class BaseApi:
     def __init__(self):
         self.session = AuthLogin.get_session()
 
-    def post_simulation_request(self, type="REGULAR", instrumentType="EQUITY",
-                                region="USA", universe="TOP3000", delay=1, decay=0,
-                                neutralization="SUBINDUSTRY", truncation=0.08, pasteurization="ON",
-                                unitHandling="VERIFY", nanHandling="ON", language="FASTEXPR", visualization=False,
-                                regular=""):
+    def reset_session(self):
+        """
+        重新认证，重置session
+        """
+        self.session = AuthLogin.get_new_session()
+
+    def post_simulation_request(self, regular: str, settings: dict):
         """
         提交回测请求
         :return: 获取回测结果的url
         """
         simulation_data = {
-            "type": type,
+            "type": settings['type'],
             "settings": {
-                "instrumentType": instrumentType,
-                "region": region,
-                "universe": universe,
-                "delay": delay,
-                "decay": decay,
-                "neutralization": neutralization,
-                "truncation": truncation,
-                "pasteurization": pasteurization,
-                "unitHandling": unitHandling,
-                "nanHandling": nanHandling,
-                "language": language,
-                "visualization": visualization
+                "instrumentType": settings['instrumentType'],
+                "region": settings['region'],
+                "universe": settings['universe'],
+                "delay": settings['delay'],
+                "decay": settings['decay'],
+                "neutralization": settings['neutralization'],
+                "truncation": settings['truncation'],
+                "pasteurization": settings['pasteurization'],
+                "unitHandling": settings['unitHandling'],
+                "nanHandling": settings['nanHandling'],
+                "language": settings['language'],
+                "visualization": settings['visualization']
             },
             "regular": regular
         }
 
         simulation_resp = self.session.post('https://api.worldquantbrain.com/simulations', json=simulation_data)
-        print(f"提交回测的Alpha: {regular}")
+        logger.info(f"提交回测的Alpha: {regular}")
         return simulation_resp.headers['Location']
 
     def get_simulation_result(self, sim_progress_url):
@@ -45,7 +49,7 @@ class BaseApi:
         :param sim_progress_url: 获取回测结果的url
         :return: alpha_id
         """
-        print(f"等待此次回测结果中....")
+        logger.info(f"等待此次回测结果中....")
         while True:
             sim_progress_resp = self.session.get(sim_progress_url)
             retry_after_sec = float(sim_progress_resp.headers.get("Retry-After", 0))
@@ -53,7 +57,7 @@ class BaseApi:
             if retry_after_sec == 0:
                 break
             time.sleep(retry_after_sec)
-        print(f"此次回测完成")
+        logger.info(f"此次回测完成")
         return sim_progress_resp.json()
 
     def get_simulation_result_alphaId(self, sim_progress_url):
@@ -112,26 +116,11 @@ class BaseApi:
         return pd.DataFrame(datafields_list)
 
 
-if __name__ == '__main__':
-    # sim_progress_url = post_simulation_request(regular="liabilities")
-    # alpha_id = get_simulation_result(sim_progress_url)
-    # print(alpha_id)
-    base_api = BaseApi()
-    searchScope = {
-        "instrumentType": "EQUITY",
-        "region": "USA",
-        "delay": "1",
-        "universe": "TOP3000"
-    }
-    fundamental6 = base_api.get_datafields(searchScope=searchScope, dataset_id="fundamental6")
-    fundamental6_datafieds = fundamental6[fundamental6['type'] == 'MATRIX']['id'].values
-    alpha_list = list()
-    for datafield in fundamental6_datafieds:
-        alpha_expression = f"group_rank({datafield}/cap, subindustry)"
-        # print(alpha_expression)
-        alpha_list.append(alpha_expression)
-    print(len(alpha_list))
-    for alpha in alpha_list:
-        sim_progress_url = base_api.post_simulation_request(regular=alpha)
-        alpha_id = base_api.get_simulation_result(sim_progress_url)
-        print(alpha_id)
+# if __name__ == '__main__':
+#
+#     base_api = BaseApi()
+#     session_old = base_api.session
+#     base_api.reset_session()
+#     session_new = base_api.session
+#     print(session_new, session_old)
+#     print(session_new is session_old)

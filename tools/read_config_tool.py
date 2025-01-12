@@ -1,7 +1,7 @@
 import json
 import os.path
+from tools.path_tool import root_dir
 
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 user_file_path = os.path.join(root_dir, 'config/user.json')
 
 

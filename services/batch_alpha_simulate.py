@@ -1,5 +1,8 @@
+import time
+
 from api.base_api import BaseApi
 from tools.generate_alpha_list import generate_alpha_list
+from common.log import logger
 
 
 class BatchAlphaSimulate:
@@ -13,19 +16,36 @@ class BatchAlphaSimulate:
         :param settings: 回测设置
         :return: alpha_id
         """
-        sim_progress_url = self.base_api.post_simulation_request(regular=alpha, type=settings['type'],
-                                                            instrumentType=settings['instrumentType'],
-                                                            region=settings['region'], universe=settings['universe'],
-                                                            delay=settings['delay'], decay=settings['decay'],
-                                                            neutralization=settings['neutralization'],
-                                                            truncation=settings['truncation'],
-                                                            pasteurization=settings['pasteurization'],
-                                                            unitHandling=settings['unitHandling'],
-                                                            nanHandling=settings['nanHandling'],
-                                                            language=settings['language'],
-                                                            visualization=settings['visualization'])
+        sim_progress_url = self.base_api.post_simulation_request(regular=alpha, settings=settings)
         alpha_id = self.base_api.get_simulation_result_alphaId(sim_progress_url)
         return alpha_id
+
+    def alpha_simulate_retry(self, alpha: str, settings: dict, max_fail_count=3, sleep_time=15):
+        """
+        回测alpha
+        :param alpha: alpha表达式
+        :param settings: 回测设置
+        :return: alpha_id
+        """
+        keep_trying = True
+        fail_count = 0
+        while keep_trying:
+            try:
+                sim_progress_url = self.base_api.post_simulation_request(regular=alpha, settings=settings)
+                logger.info(f"Alpha location is : {sim_progress_url}")
+                #成功获取location，退出循环
+                keep_trying = False
+            except Exception as e:
+                logger.error(f"No location , sleep {sleep_time} and retry, error message is : {str(e)}")
+                time.sleep(sleep_time)
+                fail_count += 1
+
+                #失败次数超过最大次数，重新认证session，退出循环
+                if fail_count >= max_fail_count:
+                    self.base_api.reset_session()
+
+                    logger.error(f"No location retry for many times, move to next alpha")
+                    break
 
     def get_company_fundmental_datafieds(self):
         """
@@ -49,11 +69,9 @@ class BatchAlphaSimulate:
         """
 
         # 组装批量alpha
-        alpha_list = list()
         fundamental6_datafieds = self.get_company_fundmental_datafieds()
-        for datafield in fundamental6_datafieds:
-            alpha_expression = f"group_rank({datafield}/cap, subindustry)"
-            alpha_list.append(alpha_expression)
+        alpha_template = "group_rank11({0}/cap, subindustry)"
+        alpha_list = generate_alpha_list(alpha_template, fundamental6_datafieds)
         # 回测批量alpha
         settings = {
             "type": "REGULAR",
@@ -70,30 +88,31 @@ class BatchAlphaSimulate:
             "language": "FASTEXPR",
             "visualization": False
         }
-        for alpha in alpha_list:
-            alpha_id = self.alpha_simulate(alpha=alpha, settings=settings)
-            print("alpha_id: ", alpha_id)
-
-
-
+        logger.info("总共有{}个alpha生成".format(len(alpha_list)))
+        for index, alpha in enumerate(alpha_list):
+            self.alpha_simulate_retry(alpha=alpha, settings=settings)
+            # logger.info(f"{index}/{len(alpha_list)}  alpha_id: {alpha_id}")
 
 
 if __name__ == '__main__':
     """
     批量回测alpha
     """
-    # batch_simulate_demo_1()
-
     batch_alpha_simulate = BatchAlphaSimulate()
+    batch_alpha_simulate.batch_simulate_demo_1()
 
-    alpha_template = "{0}({1}({2}, {3}), {4})"
-    group_cp_op = ['group_rank', 'group_zscore', 'group_neutralize']
-    ts_cp_op = ['ts_rank', 'ts_zscore', 'ts_av_diff']
-    fundmental_datafieds = batch_alpha_simulate.get_company_fundmental_datafieds()
-    days = ['200', '600']
-    group = ['market', 'sector', 'industry', 'subindustry']
-    combination_param_list = [group_cp_op, ts_cp_op, fundmental_datafieds, days, group]
+    # alpha_template = "{0}({1}({2}, {3}), {4})"
+    # group_cp_op = ['group_rank', 'group_zscore', 'group_neutralize']
+    # ts_cp_op = ['ts_rank', 'ts_zscore', 'ts_av_diff']
+    # fundmental_datafieds = batch_alpha_simulate.get_company_fundmental_datafieds()
+    # days = ['200', '600']
+    # group = ['market', 'sector', 'industry', 'subindustry', 'densify(pv13_h_f1_sector)']
+    #
+    # alpha_list = generate_alpha_list(alpha_template, group_cp_op, ts_cp_op, fundmental_datafieds, days, group)
+    # logger.info(f"the number of alpha: {len(alpha_list)}")
+    # logger.warning(f"the number of alpha: {len(alpha_list)}")
+    # logger.error(f"the number of alpha: {len(alpha_list)}")
+    # for i in alpha_list[:20]:
+    #     logger.info(i)
 
-    alpha_list = generate_alpha_list(aplha_template=alpha_template, combination_param_list=combination_param_list)
-    print("the number of alpha: ", len(alpha_list))
-    print(alpha_list[:20])
+
