@@ -20,7 +20,7 @@ class BatchAlphaSimulate:
         alpha_id = self.base_api.get_simulation_result_alphaId(sim_progress_url)
         return alpha_id
 
-    def alpha_simulate_retry(self, alpha: str, settings: dict, max_fail_count=3, sleep_time=15):
+    def alpha_simulate_retry(self, alpha: str, settings: dict, max_fail_count=15, sleep_time=15):
         """
         回测alpha
         :param alpha: alpha表达式
@@ -33,18 +33,23 @@ class BatchAlphaSimulate:
             try:
                 sim_progress_url = self.base_api.post_simulation_request(regular=alpha, settings=settings)
                 logger.info(f"Alpha location is : {sim_progress_url}")
+                sim_progress_resp = self.base_api.get_location_resp(sim_progress_url)
+                result_json = sim_progress_resp.json()
+                # print(result_json)
+                if 'status' in result_json and result_json['status'] == 'ERROR':
+                    raise Exception(result_json['message'])
                 #成功获取location，退出循环
                 keep_trying = False
             except Exception as e:
-                logger.error(f"No location , sleep {sleep_time} and retry, error message is : {str(e)}")
+                logger.error(f"This Alpha simulate error, sleep {sleep_time} and retry, error message is : {str(e)}")
                 time.sleep(sleep_time)
                 fail_count += 1
 
                 #失败次数超过最大次数，重新认证session，退出循环
                 if fail_count >= max_fail_count:
+                    logger.info("重新认证session")
                     self.base_api.reset_session()
-
-                    logger.error(f"No location retry for many times, move to next alpha")
+                    logger.error(f"This Alpha retry for many times, move to next alpha")
                     break
 
     def get_company_fundmental_datafieds(self):
@@ -70,7 +75,7 @@ class BatchAlphaSimulate:
 
         # 组装批量alpha
         fundamental6_datafieds = self.get_company_fundmental_datafieds()
-        alpha_template = "group_rank11({0}/cap, subindustry)"
+        alpha_template = "group_rank({0}/cap, subindustry)"
         alpha_list = generate_alpha_list(alpha_template, fundamental6_datafieds)
         # 回测批量alpha
         settings = {

@@ -40,8 +40,16 @@ class BaseApi:
         }
 
         simulation_resp = self.session.post('https://api.worldquantbrain.com/simulations', json=simulation_data)
-        logger.info(f"提交回测的Alpha: {regular}")
+        logger.info(f"post simulate Alpha: {regular}")
         return simulation_resp.headers['Location']
+
+    def get_location_resp(self, sim_progress_url):
+        """
+        获取回测结果
+        :param sim_progress_url: 回测结果的url
+        :return: 获取回测结果的response
+        """
+        return self.session.get(sim_progress_url)
 
     def get_simulation_result(self, sim_progress_url):
         """
