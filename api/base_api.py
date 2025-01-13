@@ -40,7 +40,7 @@ class BaseApi:
         }
 
         simulation_resp = self.session.post('https://api.worldquantbrain.com/simulations', json=simulation_data)
-        logger.info(f"post simulate Alpha: {regular}")
+        logger.info(f"Post simulate Alpha: {regular}")
         return simulation_resp.headers['Location']
 
     def get_location_resp(self, sim_progress_url):
@@ -57,7 +57,7 @@ class BaseApi:
         :param sim_progress_url: 获取回测结果的url
         :return: alpha_id
         """
-        logger.info(f"等待此次回测结果中....")
+        logger.info(f"Waiting for Alpha simulate ......")
         while True:
             sim_progress_resp = self.session.get(sim_progress_url)
             retry_after_sec = float(sim_progress_resp.headers.get("Retry-After", 0))
@@ -65,7 +65,7 @@ class BaseApi:
             if retry_after_sec == 0:
                 break
             time.sleep(retry_after_sec)
-        logger.info(f"此次回测完成")
+        logger.info(f"This Alpha simulate done!")
         return sim_progress_resp.json()
 
     def get_simulation_result_alphaId(self, sim_progress_url):

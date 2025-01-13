@@ -16,10 +16,10 @@ class AuthLogin:
             response = cls._session.post('https://api.worldquantbrain.com/authentication')
             # print(response.json())
             if response.status_code == 201:
-                logger.info('认证成功')
+                logger.info('Auth and Login success')
             else:
                 cls._session = None
-                logger.info('认证失败')
+                logger.error('Auth and Login fail')
         return cls._session
 
     @classmethod
