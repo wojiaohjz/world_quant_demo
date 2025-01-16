@@ -78,7 +78,7 @@ class BatchAlphaSimulate:
 
         # 组装批量alpha
         fundamental6_datafieds = self.get_company_fundmental_datafieds()
-        alpha_template = "group_rank11({0}/cap, subindustry)"
+        alpha_template = "group_neutralize({0}/cap, subindustry)"
         alpha_list = generate_alpha_list(alpha_template, fundamental6_datafieds)
         # 回测批量alpha
         settings = {
