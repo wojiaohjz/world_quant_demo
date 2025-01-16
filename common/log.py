@@ -23,7 +23,7 @@ class Logger:
         self.__logger.setLevel(logging.DEBUG)
         if not self.__logger.handlers:
             formatter = logging.Formatter(
-                '%(asctime)s [%(name)s] [%(levelname)s] - %(message)s')
+                '%(asctime)s [%(name)s] [%(levelname)s] [%(filename)s %(funcName)s:%(lineno)d] %(message)s')
 
             file_handler = logging.FileHandler(log_path, mode='a', encoding='utf-8')
             file_handler.setLevel(logging.INFO)
@@ -35,17 +35,8 @@ class Logger:
             console_handler.setFormatter(formatter)
             self.__logger.addHandler(console_handler)
 
-    def info(self, message):
-        self.__logger.info(message)
-
-    def debug(self, message):
-        self.__logger.debug(message)
-
-    def warning(self, message):
-        self.__logger.warning(message)
-
-    def error(self, message):
-        self.__logger.error(message)
+    def getLogger(self):
+        return self.__logger
 
 
-logger = Logger()
+logger = Logger().getLogger()
