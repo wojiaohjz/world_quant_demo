@@ -1,5 +1,6 @@
+import random
 import time
-
+from data_fields import *
 from api.base_api import BaseApi
 from tools.generate_alpha_list import generate_alpha_list
 from common.log import logger
@@ -44,9 +45,9 @@ class BatchAlphaSimulate:
                 keep_trying = False
             except Exception as e:
                 fail_count += 1
-                logger.error(f"This Alpha simulate error, sleep {sleep_time} and retry {fail_count}/{max_fail_count}, error message is : {str(e)}")
+                logger.error(
+                    f"This Alpha simulate error, sleep {sleep_time} and retry {fail_count}/{max_fail_count}, error message is : {str(e)}")
                 time.sleep(sleep_time)
-
 
                 #失败次数超过最大次数，重新认证session，退出循环
                 if fail_count >= max_fail_count:
@@ -55,21 +56,6 @@ class BatchAlphaSimulate:
                     logger.error(f"This Alpha retry for many times, move to next alpha")
                     break
 
-    def get_company_fundmental_datafieds(self):
-        """
-        获取alpha表达式中用到的公司基本面数据
-        :param alpha: alpha表达式
-        :return: 公司基本面数据
-        """
-        searchScope = {
-            "instrumentType": "EQUITY",
-            "region": "USA",
-            "delay": "1",
-            "universe": "TOP3000"
-        }
-        fundamental6 = self.base_api.get_datafields(searchScope=searchScope, dataset_id="fundamental6")
-        fundamental6_datafieds = fundamental6[fundamental6['type'] == 'MATRIX']['id'].values
-        return fundamental6_datafieds
 
     def batch_simulate_demo_1(self):
         """
@@ -77,7 +63,7 @@ class BatchAlphaSimulate:
         """
 
         # 组装批量alpha
-        fundamental6_datafieds = self.get_company_fundmental_datafieds()
+        fundamental6_datafieds = get_data_fields(dataset_id="fundamental6")
         alpha_template = "group_neutralize({0}/cap, subindustry)"
         alpha_list = generate_alpha_list(alpha_template, fundamental6_datafieds)
         # 回测批量alpha
@@ -96,11 +82,46 @@ class BatchAlphaSimulate:
             "language": "FASTEXPR",
             "visualization": False
         }
+        self.batch_simulate_alpha_list(alpha_list, settings)
+
+    def batch_simulate_demo_2(self):
+        """
+        批量回测alpha
+        """
+        # 组装批量alpha
+        alpha_template = "{0}({1}({2}, {3}), {4})"
+        group_cp_op = ['group_rank', 'group_zscore', 'group_neutralize']
+        ts_cp_op = ['ts_rank', 'ts_zscore', 'ts_av_diff']
+        fundmental_datafieds = get_data_fields(dataset_id="fundamental6")
+        days = ['200', '600']
+        group = ['market', 'sector', 'industry', 'subindustry', 'densify(pv13_h_f1_sector)']
+        alpha_list = generate_alpha_list(alpha_template, group_cp_op, ts_cp_op, fundmental_datafieds, days, group)
+        # 回测批量alpha
+        settings = {
+            "type": "REGULAR",
+            "instrumentType": "EQUITY",
+            "region": "USA",
+            "universe": "TOP3000",
+            "delay": 1,
+            "decay": 0,
+            "neutralization": "SUBINDUSTRY",
+            "truncation": 0.08,
+            "pasteurization": "ON",
+            "unitHandling": "VERIFY",
+            "nanHandling": "ON",
+            "language": "FASTEXPR",
+            "visualization": False
+        }
+        self.batch_simulate_alpha_list(alpha_list, settings)
+
+    def batch_simulate_alpha_list(self, alpha_list, settings):
+        """
+        批量回测alpha
+        """
         logger.info(f"There are total {len(alpha_list)} Alpha")
         for index, alpha in enumerate(alpha_list):
             logger.info(f"********Goto {index + 1}/{len(alpha_list)} Alpha********")
             self.alpha_simulate_retry(alpha=alpha, settings=settings)
-
 
 
 if __name__ == '__main__':
@@ -108,20 +129,27 @@ if __name__ == '__main__':
     批量回测alpha
     """
     batch_alpha_simulate = BatchAlphaSimulate()
-    batch_alpha_simulate.batch_simulate_demo_1()
-
-    # alpha_template = "{0}({1}({2}, {3}), {4})"
-    # group_cp_op = ['group_rank', 'group_zscore', 'group_neutralize']
-    # ts_cp_op = ['ts_rank', 'ts_zscore', 'ts_av_diff']
-    # fundmental_datafieds = batch_alpha_simulate.get_company_fundmental_datafieds()
+    # batch_alpha_simulate.batch_simulate_demo_1()
+    alpha_template = "ts_rank({0}/cap, 252)"
+    datafieds = get_data_fields(dataset_id="fundamental6")
     # days = ['200', '600']
-    # group = ['market', 'sector', 'industry', 'subindustry', 'densify(pv13_h_f1_sector)']
-    #
-    # alpha_list = generate_alpha_list(alpha_template, group_cp_op, ts_cp_op, fundmental_datafieds, days, group)
-    # logger.info(f"the number of alpha: {len(alpha_list)}")
-    # logger.warning(f"the number of alpha: {len(alpha_list)}")
-    # logger.error(f"the number of alpha: {len(alpha_list)}")
-    # for i in alpha_list[:20]:
-    #     logger.info(i)
-
-
+    alpha_list = list()
+    alpha_list = generate_alpha_list(alpha_template, datafieds)
+    random.shuffle(alpha_list)
+    # 回测批量alpha
+    settings = {
+        "type": "REGULAR",
+        "instrumentType": "EQUITY",
+        "region": "USA",
+        "universe": "TOP3000",
+        "delay": 1,
+        "decay": 0,
+        "neutralization": "SUBINDUSTRY",
+        "truncation": 0.08,
+        "pasteurization": "ON",
+        "unitHandling": "VERIFY",
+        "nanHandling": "ON",
+        "language": "FASTEXPR",
+        "visualization": False
+    }
+    batch_alpha_simulate.batch_simulate_alpha_list(alpha_list, settings)
